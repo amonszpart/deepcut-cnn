@@ -113,7 +113,7 @@ def estimate_pose(image, model_def, model_bin, scales=None):  # pylint: disable=
             plt.imshow(unary_maps[:, :, map_idx], interpolation='none')
             plt.imsave('map_%d.png' % map_idx,
                        unary_maps[:, :, map_idx])
-            plt.show()
+            #plt.show()
         """
 
         pose = _pose_from_mats(unary_maps, locreg_pred, scale=scale_factor)
@@ -125,7 +125,7 @@ def estimate_pose(image, model_def, model_bin, scales=None):  # pylint: disable=
             highest_confidence = minconf
             best_pose = pose
     _LOGGER.debug("Pose estimated.")
-    return best_pose
+    return best_pose, unary_maps
 
 
 def _pose_from_mats(scoremat, offmat, scale):

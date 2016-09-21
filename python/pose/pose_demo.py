@@ -119,8 +119,15 @@ def predict_pose_from(image_name,
             image = _np.dstack((image, image, image))
         else:
             image = image[:, :, ::-1]    
-        pose = estimate_pose(image, model_def, model_bin, scales)
+        pose, unary_maps = estimate_pose(image, model_def, model_bin, scales)
         _np.savez_compressed(out_name, pose=pose)
+         fname = paths.basename(f, '.jpg') .. '.h5'
+        
+        local predFile = hdf5.open(fname, 'w')
+        predFile:write('heatmap', hm) -- write heatmap
+        predFile:write('image', inp) -- write cropped image
+        predFile:close()
+        
         if visualize:
             visim = image[:, :, ::-1].copy()
             colors = [[255, 0, 0],[0, 255, 0],[0, 0, 255],[0,245,255],[255,131,250],[255,255,0],
