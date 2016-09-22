@@ -1,3 +1,4 @@
+# %load pose_demo.py
 #!/usr/bin/env python
 """
 Pose predictions in Python.
@@ -20,6 +21,7 @@ import numpy as _np
 import scipy as _scipy
 import click as _click
 import caffe as _caffe
+import h5py
 
 from estimate_pose import estimate_pose
 
@@ -72,6 +74,8 @@ def _npcircle(image, cx, cy, radius, color, transparency=0.0):
                type=_click.INT,
                help='GPU device id.',
                default=0)
+
+# python ./pose_demo.py /data/aron0/ --folder_image_suffix .jpg --gpu 1 --visualize False
 def predict_pose_from(image_name,
                       out_name=None,
                       scales='1.',
@@ -106,6 +110,9 @@ def predict_pose_from(image_name,
     if process_folder and out_name is not None and not _os.path.exists(out_name):
         _os.mkdir(out_name)
     for image_name in images:
+        extension = _os.path.splitext(image_name)[1] # added by Aron
+        folder = _os.path.dirname(image_name) # added by Aron
+        
         if out_name_provided is None:
             out_name = image_name + '_pose.npz'
         elif process_folder:
@@ -121,12 +128,49 @@ def predict_pose_from(image_name,
             image = image[:, :, ::-1]    
         pose, unary_maps = estimate_pose(image, model_def, model_bin, scales)
         _np.savez_compressed(out_name, pose=pose)
-         fname = paths.basename(f, '.jpg') .. '.h5'
+         
+        # save heatmaps to h5
+        fname = _os.path.join(folder, _os.path.splitext(image_name)[0] + '.h5')
+        f = h5py.File(fname, 'w')
         
-        local predFile = hdf5.open(fname, 'w')
-        predFile:write('heatmap', hm) -- write heatmap
-        predFile:write('image', inp) -- write cropped image
-        predFile:close()
+        # unary_maps order:
+        # 0 - R ankle, 1 - r knee, 2 - r hip, 3 - l hip, 4 - l knee, 5 - l ankle, 
+        # 6 - pelvis, 7 - thorax, # MISSING!
+        # 8 - upper neck, 9 - head top, 10 - r wrist, 11 - r elbow, 12 - r shoulder, 13 - l shoulder, 14 - l elbow, 15 - l wrist
+        # monocap expected output order:
+        # 'RAnk','RKne','RHip','LHip','LKne','LAnk', 'Pelv','Thrx','Neck','Head','RWri','RElb','RSho','LSho','LElb','LWri'
+        
+        
+        # hack to 
+        # print('unary_maps.shape: ', unary_maps.shape[0], unary_maps.shape[1], unary_maps.shape[2])
+        pelvis = (unary_maps[:,:,2] + unary_maps[:,:,3])/2.
+        thorax = (2. * pelvis + unary_maps[:,:,12] + unary_maps[:,:,13])/4.
+        um2 = _np.zeros(shape=(unary_maps.shape[0], unary_maps.shape[1], 16), dtype='float32')
+        # print('um2.shape: ', um2.shape)
+        for j in range(0, 6):
+            # print(j, '<-', j)
+            um2[:,:,j] = unary_maps[:,:,j]
+        um2[:, :, 6] = pelvis
+        print(_np.sum(um2[:,:,6]), _np.sum(pelvis))
+        # print(6, '<-', 'pelvis')
+        um2[:, :, 7] = thorax
+        print(_np.sum(um2[:,:,7]), _np.sum(thorax))
+
+        # print(7, '<-', 'thorax')
+        for j in range(8, 16):
+            # print(j, '<-', j-2)
+            um2[:,:,j] = unary_maps[:,:,j-2]
+            
+
+        um2 = _np.swapaxes(um2, 0, 2)
+        image = _np.swapaxes(image, 0, 2)
+        #h5Hm = f.create_dataset('heatmap', um2.shape, dtype='float32')
+        f['heatmap'] = um2
+        f['image'] = image
+        #h5Hm = um2
+        #h5Image = f.create_dataset('image', image.shape, dtype='uint8')
+        #h5Image = image
+        f.close()
         
         if visualize:
             visim = image[:, :, ::-1].copy()
@@ -142,7 +186,6 @@ def predict_pose_from(image_name,
                           0.0)
             vis_name = out_name + '_vis.png'
             _scipy.misc.imsave(vis_name, visim)
-
 
 if __name__ == '__main__':
     _logging.basicConfig(level=_logging.INFO)

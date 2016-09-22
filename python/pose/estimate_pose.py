@@ -108,14 +108,14 @@ def estimate_pose(image, model_def, model_bin, scales=None):  # pylint: disable=
 
         """
         import matplotlib.pyplot as plt
-        plt.figure()
+        #plt.figure()
         for map_idx in range(unary_maps.shape[2]):
             plt.imshow(unary_maps[:, :, map_idx], interpolation='none')
             plt.imsave('map_%d.png' % map_idx,
                        unary_maps[:, :, map_idx])
             #plt.show()
         """
-
+        
         pose = _pose_from_mats(unary_maps, locreg_pred, scale=scale_factor)
 
         minconf = _np.min(pose[2, :])
